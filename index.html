@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>강화 시뮬레이터 ULTIMATE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
+        body { 
+            font-family: 'Pretendard', sans-serif; 
+            background-color: #050505; 
+            color: white; 
+            touch-action: manipulation;
+            user-select: none;
+        }
+        
+        .success-flash { animation: flash-green 0.4s ease-out; }
+        .failure-flash { animation: flash-red 0.4s ease-out; }
+        
+        @keyframes flash-green {
+            0% { background-color: rgba(34, 197, 94, 0.15); }
+            100% { background-color: transparent; }
+        }
+        @keyframes flash-red {
+            0% { background-color: rgba(239, 68, 68, 0.15); }
+            100% { background-color: transparent; }
+        }
+
+        .gold-popup {
+            animation: float-up 0.5s ease-out forwards;
+            position: absolute;
+            pointer-events: none;
+            z-index: 50;
+        }
+        @keyframes float-up {
+            0% { opacity: 1; transform: translate(-50%, 0); }
+            100% { opacity: 0; transform: translate(-50%, -60px); }
+        }
+
+        .card-glass { 
+            background: linear-gradient(145deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.6));
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            backdrop-filter: blur(12px);
+        }
+        
+        .btn-press:active { transform: scale(0.97); }
+
+        /* 커스텀 스크롤바 */
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
+        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+
+        .notice-banner {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            animation: pulse-border 2s infinite;
+        }
+        @keyframes pulse-border {
+            0%, 100% { border-color: rgba(59, 130, 246, 0.3); }
+            50% { border-color: rgba(59, 130, 246, 0.7); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start p-4 pt-6">
+
+    <div id="game-container" class="w-full max-w-md p-6 rounded-[2.5rem] shadow-2xl card-glass relative overflow-hidden">
+        
+        <!-- 공지 섹션 -->
+        <div class="notice-banner mb-6 p-3 rounded-2xl flex items-start gap-3">
+            <div class="bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md uppercase">Notice</div>
+            <div class="flex-1">
+                <p class="text-[11px] font-bold text-blue-200">1.0V 게임이 출시 되었습니다.[4월 10일]</p>
+                <p class="text-[9px] text-blue-300/60 mt-0.5 italic">환영합니다! 당신은 어디 까지 강화 할수 있나요?</p>
+            </div>
+        </div>
+
+        <!-- 상단 정보 UI -->
+        <div class="flex justify-between items-start mb-6">
+            <div class="space-y-1">
+                <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest text-left">보유 골드</p>
+                <div class="flex items-center gap-1">
+                    <span id="gold-display" class="text-3xl font-black text-yellow-400 leading-none">0</span>
+                    <span class="text-yellow-600 font-bold text-sm">G</span>
+                </div>
+            </div>
+            <div class="text-right space-y-1">
+                <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest">강화 성공 확률</p>
+                <p id="chance-display" class="text-2xl font-black text-cyan-400 leading-none">60%</p>
+            </div>
+        </div>
+
+        <!-- 메인 디스플레이 박스 -->
+        <div id="main-display" class="relative flex flex-col items-center justify-center py-14 mb-6 rounded-3xl bg-black/30 border border-white/5 shadow-inner">
+            <div class="text-[10px] text-slate-600 font-bold mb-1 uppercase tracking-[0.4em]">무기 강화 레벨</div>
+            <div id="level-display" class="text-8xl font-black text-white italic transition-all duration-200 drop-shadow-2xl">+0</div>
+            <div id="status-msg" class="mt-4 h-5 text-sm font-black opacity-0 transition-opacity uppercase tracking-tighter">성공</div>
+            
+            <div id="multi-tag" class="absolute top-4 right-4 bg-white/10 text-white/50 text-[9px] px-2 py-1 rounded-full font-bold">x1 강화 시도 중</div>
+        </div>
+
+        <!-- 강화 실행 버튼 -->
+        <button onclick="attemptUpgrade()" class="btn-press w-full py-6 mb-8 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 transition-all font-black text-2xl shadow-xl shadow-cyan-950/50 border-t border-white/20">
+            강화하기
+        </button>
+
+        <!-- 업그레이드 리스트 -->
+        <div class="space-y-3 overflow-y-auto max-h-[250px] pr-1 custom-scroll">
+            <p class="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] px-1 text-left">업그레이드 상점</p>
+            
+            <!-- 골드 수급량 강화 -->
+            <button onclick="upgradeGold()" id="btn-gold" class="btn-press w-full flex justify-between items-center p-4 rounded-2xl bg-slate-800/30 hover:bg-slate-800/50 border border-white/5 transition-all">
+                <div class="text-left">
+                    <p class="text-sm font-bold text-slate-200">성공 시 골드 획득량 (+1)</p>
+                    <p class="text-[10px] text-slate-500 font-medium text-yellow-500/80" id="gold-multiplier-text">비용 증가: x1.3</p>
+                </div>
+                <div id="cost-gold" class="bg-yellow-400 text-black px-3 py-1.5 rounded-xl font-black text-[11px] shadow-lg whitespace-nowrap">2G</div>
+            </button>
+
+            <!-- 성공 확률 강화 -->
+            <button onclick="upgradeRate()" id="btn-rate" class="btn-press w-full flex justify-between items-center p-4 rounded-2xl bg-slate-800/30 hover:bg-slate-800/50 border border-white/5 transition-all">
+                <div class="text-left">
+                    <p class="text-sm font-bold text-slate-200">강화 성공 확률 (+1%)</p>
+                    <p class="text-[10px] text-slate-500 font-medium text-cyan-500/80" id="rate-multiplier-text">비용 증가: x1.3</p>
+                </div>
+                <div id="cost-rate" class="bg-cyan-500 text-black px-3 py-1.5 rounded-xl font-black text-[11px] shadow-lg whitespace-nowrap">30G</div>
+            </button>
+
+            <!-- 연속 강화 단계 해제 -->
+            <button onclick="upgradeMulti()" id="btn-multi" class="btn-press w-full flex justify-between items-center p-4 rounded-2xl bg-indigo-950/30 hover:bg-indigo-900/40 border border-indigo-500/20 transition-all">
+                <div class="text-left">
+                    <p id="multi-title" class="text-sm font-bold text-indigo-300">연속 강화 잠금해제</p>
+                    <p class="text-[10px] text-indigo-400 font-medium" id="multi-desc">현재 배수: <span id="multi-val">x1</span></p>
+                </div>
+                <div id="cost-multi" class="bg-indigo-600 text-white px-3 py-1.5 rounded-xl font-black text-[11px] shadow-lg whitespace-nowrap">5,000G</div>
+            </button>
+        </div>
+
+        <!-- 하단 초기화 버튼 -->
+        <div class="mt-8 flex justify-between items-center px-2">
+            <p class="text-[8px] text-slate-700 font-black uppercase tracking-[0.3em]">데이터 자동 저장됨</p>
+            <button onclick="resetGame()" class="text-[9px] text-red-500/50 hover:text-red-500 font-bold uppercase tracking-widest transition-colors">데이터 초기화</button>
+        </div>
+    </div>
+
+    <script>
+        // 초기 게임 상태
+        let gold = 0;
+        let level = 0;
+        let successRate = 60;
+        let goldPerSuccess = 1;
+        let multiCount = 1;
+
+        // 비용 변수
+        let costGold = 2;
+        let costRate = 30;
+        
+        // 다중 강화 단계 설정
+        const multiStages = [
+            { count: 2, cost: 5000, label: "강화 2배수 해제", reqLevel: 0 },
+            { count: 3, cost: 20000, label: "강화 3배수 해제", reqLevel: 0 },
+            { count: 4, cost: 45000, label: "강화 4배수 해제", reqLevel: 0 },
+            { count: 5, cost: 70000, label: "강화 5배수 해제", reqLevel: 1000 }
+        ];
+        let currentMultiIdx = 0;
+
+        // DOM 캐싱
+        const elGold = document.getElementById('gold-display');
+        const elLevel = document.getElementById('level-display');
+        const elChance = document.getElementById('chance-display');
+        const elMultiVal = document.getElementById('multi-val');
+        const elMultiTitle = document.getElementById('multi-title');
+        const elMultiDesc = document.getElementById('multi-desc');
+        const elStatus = document.getElementById('status-msg');
+        const elDisplay = document.getElementById('main-display');
+        const elTag = document.getElementById('multi-tag');
+
+        const elCostGold = document.getElementById('cost-gold');
+        const elCostRate = document.getElementById('cost-rate');
+        const elCostMulti = document.getElementById('cost-multi');
+        const elGoldMultText = document.getElementById('gold-multiplier-text');
+        const elRateMultText = document.getElementById('rate-multiplier-text');
+
+        // --- 저장 및 불러오기 기능 ---
+        const SAVE_KEY = 'upgrade_sim_ultimate_save';
+
+        function saveGame() {
+            const gameState = {
+                gold,
+                level,
+                successRate,
+                goldPerSuccess,
+                multiCount,
+                costGold,
+                costRate,
+                currentMultiIdx
+            };
+            localStorage.setItem(SAVE_KEY, JSON.stringify(gameState));
+        }
+
+        function loadGame() {
+            const savedData = localStorage.getItem(SAVE_KEY);
+            if (savedData) {
+                try {
+                    const data = JSON.parse(savedData);
+                    gold = data.gold ?? 0;
+                    level = data.level ?? 0;
+                    successRate = data.successRate ?? 60;
+                    goldPerSuccess = data.goldPerSuccess ?? 1;
+                    multiCount = data.multiCount ?? 1;
+                    costGold = data.costGold ?? 2;
+                    costRate = data.costRate ?? 30;
+                    currentMultiIdx = data.currentMultiIdx ?? 0;
+                } catch (e) {
+                    console.error("저장된 데이터를 불러오는 데 실패했습니다.", e);
+                }
+            }
+            updateUI();
+        }
+
+        function resetGame() {
+            if (confirm("정말로 모든 진행 상황을 초기화하시겠습니까? 저장된 모든 데이터가 삭제됩니다.")) {
+                localStorage.removeItem(SAVE_KEY);
+                location.reload();
+            }
+        }
+
+        function updateUI() {
+            elGold.innerText = Math.floor(gold).toLocaleString();
+            elLevel.innerText = `+${level}`;
+            elChance.innerText = `${successRate}%`;
+            elMultiVal.innerText = `x${multiCount}`;
+            elTag.innerText = `x${multiCount} 강화 시도 중`;
+
+            elCostGold.innerText = `${Math.floor(costGold).toLocaleString()}G`;
+            elCostRate.innerText = successRate >= 99 ? '최대치' : `${Math.floor(costRate).toLocaleString()}G`;
+            
+            if (goldPerSuccess >= 100) {
+                elGoldMultText.innerText = "비용 증가: x1.5 (고효율)";
+            } else {
+                elGoldMultText.innerText = "비용 증가: x1.3";
+            }
+
+            if (successRate >= 91) elRateMultText.innerText = "비용 증가: x3.0";
+            else if (successRate >= 76) elRateMultText.innerText = "비용 증가: x2.0";
+            else if (successRate >= 61) elRateMultText.innerText = "비용 증가: x1.3";
+            else elRateMultText.innerText = "비용 증가: x1.1";
+
+            if (currentMultiIdx < multiStages.length) {
+                const stage = multiStages[currentMultiIdx];
+                elCostMulti.innerText = `${stage.cost.toLocaleString()}G`;
+                elMultiTitle.innerText = stage.label;
+                
+                if (stage.reqLevel > 0) {
+                    elMultiDesc.innerHTML = `요구 레벨: <span class="${level >= stage.reqLevel ? 'text-green-400' : 'text-red-400'}">+${stage.reqLevel}</span> (현재: +${level})`;
+                } else {
+                    elMultiDesc.innerText = `현재 배수: x${multiCount}`;
+                }
+                document.getElementById('btn-multi').style.display = 'flex';
+            } else {
+                document.getElementById('btn-multi').style.display = 'none';
+            }
+
+            document.getElementById('btn-gold').style.opacity = gold < costGold ? '0.4' : '1';
+            document.getElementById('btn-rate').style.opacity = (gold < costRate || successRate >= 99) ? '0.4' : '1';
+            
+            if (currentMultiIdx < multiStages.length) {
+                const canBuyMulti = gold >= multiStages[currentMultiIdx].cost && level >= multiStages[currentMultiIdx].reqLevel;
+                document.getElementById('btn-multi').style.opacity = canBuyMulti ? '1' : '0.4';
+            }
+        }
+
+        function triggerPopUp(val) {
+            const popup = document.createElement('div');
+            popup.className = 'gold-popup font-black text-yellow-400 text-xl drop-shadow-lg';
+            popup.style.left = '50%';
+            popup.style.top = '45%';
+            popup.innerText = `+${val}G`;
+            elDisplay.appendChild(popup);
+            setTimeout(() => popup.remove(), 500);
+        }
+
+        function attemptUpgrade() {
+            let wins = 0;
+            let loses = 0;
+            let earnedGold = 0;
+
+            for(let i = 0; i < multiCount; i++) {
+                if (Math.random() * 100 < successRate) {
+                    level++;
+                    earnedGold += goldPerSuccess;
+                    wins++;
+                } else {
+                    if (level > 0) level--;
+                    loses++;
+                }
+            }
+
+            gold += earnedGold;
+
+            elDisplay.classList.remove('success-flash', 'failure-flash');
+            void elDisplay.offsetWidth;
+
+            if (wins >= loses && wins > 0) {
+                elDisplay.classList.add('success-flash');
+                elStatus.innerText = `성공! +${wins}`;
+                elStatus.className = "mt-4 h-5 text-sm font-black text-cyan-400 opacity-100 uppercase tracking-widest";
+                if (earnedGold > 0) triggerPopUp(earnedGold);
+            } else {
+                elDisplay.classList.add('failure-flash');
+                elStatus.innerText = `실패... -${loses}`;
+                elStatus.className = "mt-4 h-5 text-sm font-black text-red-500 opacity-100 uppercase tracking-widest";
+            }
+
+            setTimeout(() => { elStatus.style.opacity = '0'; }, 600);
+            saveGame();
+            updateUI();
+        }
+
+        function upgradeGold() {
+            if (gold >= costGold) {
+                gold -= costGold;
+                goldPerSuccess += 1;
+                
+                if (goldPerSuccess >= 100) {
+                    costGold *= 1.5;
+                } else {
+                    costGold *= 1.3;
+                }
+                saveGame();
+                updateUI();
+            }
+        }
+
+        function upgradeRate() {
+            if (successRate < 99 && gold >= costRate) {
+                gold -= costRate;
+                successRate += 1;
+                
+                if (successRate >= 91) {
+                    costRate *= 3.0;
+                } else if (successRate >= 76) {
+                    costRate *= 2.0;
+                } else if (successRate >= 61) {
+                    costRate *= 1.3;
+                } else {
+                    costRate *= 1.1;
+                }
+                saveGame();
+                updateUI();
+            }
+        }
+
+        function upgradeMulti() {
+            if (currentMultiIdx < multiStages.length) {
+                const stage = multiStages[currentMultiIdx];
+                if (gold >= stage.cost && level >= stage.reqLevel) {
+                    gold -= stage.cost;
+                    multiCount = stage.count;
+                    currentMultiIdx++;
+                    saveGame();
+                    updateUI();
+                }
+            }
+        }
+
+        window.onload = loadGame;
+    </script>
+</body>
+</html>

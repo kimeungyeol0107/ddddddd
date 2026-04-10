@@ -3,411 +3,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>그저 평범한 클릭 강화 게임</title>
+    <title>강화 시뮬레이터</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
-        body { 
-            font-family: 'Pretendard', sans-serif; 
-            background-color: #050505; 
-            color: white; 
-            touch-action: manipulation;
-            user-select: none;
-        }
-        
-        .success-flash { animation: flash-green 0.4s ease-out; }
-        .failure-flash { animation: flash-red 0.4s ease-out; }
-        
-        @keyframes flash-green {
-            0% { background-color: rgba(34, 197, 94, 0.15); }
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700&display=swap');
+        body { font-family: 'Pretendard', sans-serif; background-color: #0f172a; color: white; touch-action: manipulation; }
+        .success-flash { animation: flash 0.5s ease-out; }
+        @keyframes flash {
+            0% { background-color: rgba(34, 197, 94, 0.4); }
             100% { background-color: transparent; }
         }
+        .failure-flash { animation: flash-red 0.5s ease-out; }
         @keyframes flash-red {
-            0% { background-color: rgba(239, 68, 68, 0.15); }
+            0% { background-color: rgba(239, 68, 68, 0.4); }
             100% { background-color: transparent; }
         }
-
-        .gold-popup {
-            animation: float-up 0.5s ease-out forwards;
-            position: absolute;
-            pointer-events: none;
-            z-index: 50;
-        }
-        @keyframes float-up {
-            0% { opacity: 1; transform: translate(-50%, 0); }
-            100% { opacity: 0; transform: translate(-50%, -60px); }
-        }
-
-        .card-glass { 
-            background: linear-gradient(145deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.6));
-            border: 1px solid rgba(255, 255, 255, 0.1); 
-            backdrop-filter: blur(12px);
-        }
-        
-        .btn-press:active { transform: scale(0.97); }
-
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
-        .custom-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
-        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
-
-        .notice-banner {
-            background: rgba(59, 130, 246, 0.1);
-            border: 1px solid rgba(59, 130, 246, 0.3);
-        }
-        
-        .penalty-active {
-            color: #ef4444;
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
+        .button-press { transform: scale(0.95); transition: transform 0.1s; }
+        .stat-card { background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-start p-4 pt-6">
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
 
-    <div id="game-container" class="w-full max-w-md p-6 rounded-[2.5rem] shadow-2xl card-glass relative overflow-hidden">
-        
-        <!-- 공지 섹션 -->
-        <div class="notice-banner mb-6 p-3 rounded-2xl flex items-start gap-3">
-            <div class="bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md uppercase">공지</div>
-            <div class="flex-1">
-                <p class="text-[11px] font-bold text-blue-200">1.0V 게임이 출시 되었습니다.</p>
-                <p class="text-[9px] text-blue-300/60 mt-0.5 italic">그저 평범한 클릭 강화 게임에 오신 것을 환영합니다!</p>
+    <div id="game-container" class="w-full max-w-md p-6 rounded-3xl shadow-2xl stat-card relative overflow-hidden transition-all duration-300">
+        <!-- Header Stats -->
+        <div class="flex justify-between items-center mb-8">
+            <div class="text-left">
+                <p class="text-gray-400 text-sm">소지 골드</p>
+                <p id="gold-display" class="text-3xl font-bold text-yellow-400">0G</p>
+            </div>
+            <div class="text-right">
+                <p class="text-gray-400 text-sm">성공 확률</p>
+                <p id="chance-display" class="text-2xl font-bold text-green-400">80%</p>
             </div>
         </div>
 
-        <!-- 상단 정보 UI -->
-        <div class="flex justify-between items-start mb-6">
-            <div class="space-y-1">
-                <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest text-left">보유 골드</p>
-                <div class="flex items-center gap-1">
-                    <span id="gold-display" class="text-3xl font-black text-yellow-400 leading-none">0</span>
-                    <span class="text-yellow-600 font-bold text-sm">G</span>
-                </div>
-            </div>
-            <div class="text-right space-y-1">
-                <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest">강화 성공 확률</p>
-                <div class="flex flex-col items-end">
-                    <p id="chance-display" class="text-2xl font-black text-cyan-400 leading-none">60%</p>
-                    <p id="penalty-display" class="text-[9px] font-bold mt-1 penalty-active hidden">확률 패널티 활성화 (÷1.5)</p>
-                </div>
-            </div>
+        <!-- Main Weapon Area -->
+        <div class="flex flex-col items-center justify-center py-10 mb-8 rounded-2xl bg-slate-800/50 border border-slate-700">
+            <div class="text-sm text-gray-400 mb-2 uppercase tracking-widest">현재 강화 단계</div>
+            <div id="level-display" class="text-6xl font-black text-white drop-shadow-lg">+0</div>
+            <div id="status-msg" class="mt-4 h-6 text-sm font-medium opacity-0 transition-opacity">성공! +1 골드 획득</div>
         </div>
 
-        <!-- 메인 디스플레이 박스 -->
-        <div id="main-display" class="relative flex flex-col items-center justify-center py-14 mb-6 rounded-3xl bg-black/30 border border-white/5 shadow-inner">
-            <div class="text-[10px] text-slate-600 font-bold mb-1 uppercase tracking-[0.4em]">무기 강화 레벨</div>
-            <div id="level-display" class="text-8xl font-black text-white italic transition-all duration-200 drop-shadow-2xl">+0</div>
-            <div id="status-msg" class="mt-4 h-5 text-sm font-black opacity-0 transition-opacity uppercase tracking-tighter">성공</div>
-            
-            <div id="multi-tag" class="absolute top-4 right-4 bg-white/10 text-white/50 text-[9px] px-2 py-1 rounded-full font-bold">x1 강화 시도 중</div>
-        </div>
-
-        <!-- 강화 실행 버튼 -->
-        <button onclick="attemptUpgrade()" class="btn-press w-full py-6 mb-8 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 transition-all font-black text-2xl shadow-xl shadow-cyan-950/50 border-t border-white/20">
-            강화하기
+        <!-- Main Action Button -->
+        <button onclick="attemptUpgrade()" class="w-full py-6 mb-6 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 transition-all font-bold text-xl shadow-lg shadow-indigo-500/20">
+            강화 시도 (무료)
         </button>
 
-        <!-- 업그레이드 리스트 -->
-        <div class="space-y-3 overflow-y-auto max-h-[300px] pr-1 custom-scroll">
-            <p class="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] px-1 text-left">업그레이드 상점</p>
-            
-            <!-- 골드 수급량 강화 -->
-            <button onclick="upgradeGold()" id="btn-gold" class="btn-press w-full flex justify-between items-center p-4 rounded-2xl bg-slate-800/30 hover:bg-slate-800/50 border border-white/5 transition-all">
+        <!-- Upgrades Section -->
+        <div class="grid grid-cols-1 gap-4">
+            <!-- Gold Multiplier Upgrade -->
+            <button id="upgrade-gold-btn" onclick="upgradeGoldPerSuccess()" class="flex justify-between items-center p-4 rounded-xl bg-slate-700 hover:bg-slate-600 active:scale-98 transition-all border border-slate-600">
                 <div class="text-left">
-                    <p class="text-sm font-bold text-slate-200">성공 시 골드 획득량 (+1)</p>
-                    <p class="text-[10px] text-slate-500 font-medium text-yellow-500/80" id="gold-multiplier-text">비용 증가: x1.3</p>
+                    <p class="font-bold">골드 획득량 +1</p>
+                    <p class="text-xs text-gray-400">현재: 성공 시 <span id="gps-display">1</span>G</p>
                 </div>
-                <div id="cost-gold" class="bg-yellow-400 text-black px-3 py-1.5 rounded-xl font-black text-[11px] shadow-lg whitespace-nowrap">2G</div>
+                <div id="gold-cost-display" class="bg-yellow-500/20 text-yellow-400 px-3 py-1 rounded-lg font-bold text-sm">
+                    10G
+                </div>
             </button>
 
-            <!-- 성공 확률 강화 -->
-            <button onclick="upgradeRate()" id="btn-rate" class="btn-press w-full flex justify-between items-center p-4 rounded-2xl bg-slate-800/30 hover:bg-slate-800/50 border border-white/5 transition-all">
+            <!-- Success Rate Upgrade -->
+            <button id="upgrade-rate-btn" onclick="upgradeSuccessRate()" class="flex justify-between items-center p-4 rounded-xl bg-slate-700 hover:bg-slate-600 active:scale-98 transition-all border border-slate-600">
                 <div class="text-left">
-                    <p class="text-sm font-bold text-slate-200">강화 성공 확률 (+1%)</p>
-                    <p class="text-[10px] text-slate-500 font-medium text-cyan-500/80" id="rate-multiplier-text">비용 증가: x1.3</p>
+                    <p class="font-bold">성공 확률 +1%</p>
+                    <p class="text-xs text-gray-400 text-red-400" id="rate-max-note">최대: 99%</p>
                 </div>
-                <div id="cost-rate" class="bg-cyan-500 text-black px-3 py-1.5 rounded-xl font-black text-[11px] shadow-lg whitespace-nowrap">30G</div>
-            </button>
-
-            <!-- 정상화 업그레이드 (패널티 해제) -->
-            <button onclick="upgradeNormalize()" id="btn-normalize" class="btn-press w-full hidden flex justify-between items-center p-4 rounded-2xl bg-red-950/30 hover:bg-red-900/40 border border-red-500/20 transition-all">
-                <div class="text-left">
-                    <p id="normalize-title" class="text-sm font-bold text-red-300">확률 정상화 단계</p>
-                    <p class="text-[10px] text-red-400 font-medium" id="normalize-desc">나누기 감소: ÷1.5 → ÷1.4</p>
+                <div id="rate-cost-display" class="bg-green-500/20 text-green-400 px-3 py-1 rounded-lg font-bold text-sm">
+                    500G
                 </div>
-                <div id="cost-normalize" class="bg-red-600 text-white px-3 py-1.5 rounded-xl font-black text-[11px] shadow-lg whitespace-nowrap">60,000G</div>
-            </button>
-
-            <!-- 연속 강화 단계 해제 -->
-            <button onclick="upgradeMulti()" id="btn-multi" class="btn-press w-full flex justify-between items-center p-4 rounded-2xl bg-indigo-950/30 hover:bg-indigo-900/40 border border-indigo-500/20 transition-all">
-                <div class="text-left">
-                    <p id="multi-title" class="text-sm font-bold text-indigo-300">연속 강화 잠금해제</p>
-                    <p class="text-[10px] text-indigo-400 font-medium" id="multi-desc">현재 배수: <span id="multi-val">x1</span></p>
-                </div>
-                <div id="cost-multi" class="bg-indigo-600 text-white px-3 py-1.5 rounded-xl font-black text-[11px] shadow-lg whitespace-nowrap">5,000G</div>
             </button>
         </div>
 
-        <!-- 하단 초기화 버튼 -->
-        <div class="mt-8 flex justify-between items-center px-2">
-            <p class="text-[8px] text-slate-700 font-black uppercase tracking-[0.3em]">데이터 자동 저장됨</p>
-            <button onclick="resetGame()" class="text-[9px] text-red-500/50 hover:text-red-500 font-bold uppercase tracking-widest transition-colors">데이터 초기화</button>
+        <div class="mt-8 flex justify-between items-center px-1">
+            <p class="text-[10px] text-gray-500 uppercase">자동 저장 활성</p>
+            <button onclick="resetData()" class="text-[10px] text-red-500/50 hover:text-red-500 transition-colors font-bold uppercase tracking-widest">데이터 초기화</button>
         </div>
     </div>
 
     <script>
         // 초기 게임 상태
-        let gold = 0;
         let level = 0;
-        let baseSuccessRate = 60;
+        let gold = 0;
+        let successRate = 80;
         let goldPerSuccess = 1;
-        let multiCount = 1;
-        let currentPenaltyDivisor = 1.5;
 
-        // 비용 변수
-        let costGold = 2;
-        let costRate = 30;
-        
-        // 다중 강화 단계 설정
-        const multiStages = [
-            { count: 2, cost: 5000, label: "강화 2배수 해제", reqLevel: 0 },
-            { count: 3, cost: 20000, label: "강화 3배수 해제", reqLevel: 0 },
-            { count: 4, cost: 45000, label: "강화 4배수 해제", reqLevel: 0 },
-            { count: 5, cost: 70000, label: "강화 5배수 해제", reqLevel: 1000 },
-            { count: 6, cost: 120000, label: "강화 6배수 해제", reqLevel: 10000 }
-        ];
-        let currentMultiIdx = 0;
+        // 업그레이드 초기 비용
+        let goldUpgradeCost = 10;
+        let rateUpgradeCost = 500;
 
-        // 정상화 단계 설정
-        const normalizeStages = [
-            { div: 1.4, cost: 60000, label: "정상화 1단계 (÷1.4)" },
-            { div: 1.3, cost: 100000, label: "정상화 2단계 (÷1.3)" },
-            { div: 1.2, cost: 150000, label: "정상화 3단계 (÷1.2)" },
-            { div: 1.1, cost: 180000, label: "정상화 4단계 (÷1.1)" },
-            { div: 1.0, cost: 200000, label: "정상화 완료 (÷1.0)" }
-        ];
-        let currentNormalizeIdx = 0;
+        const levelEl = document.getElementById('level-display');
+        const goldEl = document.getElementById('gold-display');
+        const chanceEl = document.getElementById('chance-display');
+        const gpsEl = document.getElementById('gps-display');
+        const statusMsgEl = document.getElementById('status-msg');
+        const container = document.getElementById('game-container');
 
-        // DOM 캐싱
-        const elGold = document.getElementById('gold-display');
-        const elLevel = document.getElementById('level-display');
-        const elChance = document.getElementById('chance-display');
-        const elPenalty = document.getElementById('penalty-display');
-        const elMultiVal = document.getElementById('multi-val');
-        const elMultiTitle = document.getElementById('multi-title');
-        const elMultiDesc = document.getElementById('multi-desc');
-        const elStatus = document.getElementById('status-msg');
-        const elDisplay = document.getElementById('main-display');
-        const elTag = document.getElementById('multi-tag');
+        const goldCostEl = document.getElementById('gold-cost-display');
+        const rateCostEl = document.getElementById('rate-cost-display');
 
-        const elCostGold = document.getElementById('cost-gold');
-        const elCostRate = document.getElementById('cost-rate');
-        const elCostMulti = document.getElementById('cost-multi');
-        const elGoldMultText = document.getElementById('gold-multiplier-text');
-        const elRateMultText = document.getElementById('rate-multiplier-text');
-
-        const elBtnNormalize = document.getElementById('btn-normalize');
-        const elCostNormalize = document.getElementById('cost-normalize');
-        const elNormalizeTitle = document.getElementById('normalize-title');
-        const elNormalizeDesc = document.getElementById('normalize-desc');
-
-        const SAVE_KEY = 'simple_upgrade_game_v6';
+        // --- 저장 및 불러오기 기능 ---
+        const SAVE_KEY = 'upgrade_sim_save_data';
 
         function saveGame() {
-            const gameState = {
-                gold, level, baseSuccessRate, goldPerSuccess, multiCount,
-                costGold, costRate, currentMultiIdx, currentNormalizeIdx, currentPenaltyDivisor
+            const gameData = {
+                level,
+                gold,
+                successRate,
+                goldPerSuccess,
+                goldUpgradeCost,
+                rateUpgradeCost
             };
-            localStorage.setItem(SAVE_KEY, JSON.stringify(gameState));
+            localStorage.setItem(SAVE_KEY, JSON.stringify(gameData));
         }
 
         function loadGame() {
             const savedData = localStorage.getItem(SAVE_KEY);
             if (savedData) {
-                try {
-                    const data = JSON.parse(savedData);
-                    gold = data.gold ?? 0;
-                    level = data.level ?? 0;
-                    baseSuccessRate = data.baseSuccessRate ?? 60;
-                    goldPerSuccess = data.goldPerSuccess ?? 1;
-                    multiCount = data.multiCount ?? 1;
-                    costGold = data.costGold ?? 2;
-                    costRate = data.costRate ?? 30;
-                    currentMultiIdx = data.currentMultiIdx ?? 0;
-                    currentNormalizeIdx = data.currentNormalizeIdx ?? 0;
-                    currentPenaltyDivisor = data.currentPenaltyDivisor ?? 1.5;
-                } catch (e) { console.error("Load failed", e); }
+                const data = JSON.parse(savedData);
+                level = data.level ?? 0;
+                gold = data.gold ?? 0;
+                successRate = data.successRate ?? 80;
+                goldPerSuccess = data.goldPerSuccess ?? 1;
+                goldUpgradeCost = data.goldUpgradeCost ?? 10;
+                rateUpgradeCost = data.rateUpgradeCost ?? 500;
             }
             updateUI();
         }
 
-        function resetGame() {
-            if (confirm("모든 데이터를 초기화할까요?")) {
+        function resetData() {
+            if (confirm("정말로 모든 진행 상황을 초기화하시겠습니까?")) {
                 localStorage.removeItem(SAVE_KEY);
                 location.reload();
             }
         }
 
-        function getCurrentChance() {
-            if (level >= 10000) {
-                return (baseSuccessRate / currentPenaltyDivisor).toFixed(1);
-            }
-            return baseSuccessRate;
-        }
-
         function updateUI() {
-            elGold.innerText = Math.floor(gold).toLocaleString();
-            elLevel.innerText = `+${level}`;
-            const currentChance = getCurrentChance();
-            elChance.innerText = `${currentChance}%`;
-
-            if (level >= 10000 && currentPenaltyDivisor > 1.0) {
-                elPenalty.classList.remove('hidden');
-                elPenalty.innerText = `확률 패널티 활성화 (÷${currentPenaltyDivisor})`;
-                elBtnNormalize.classList.remove('hidden');
-            } else {
-                elPenalty.classList.add('hidden');
-                elBtnNormalize.classList.add('hidden');
-            }
-
-            elMultiVal.innerText = `x${multiCount}`;
-            elTag.innerText = `x${multiCount} 강화 시도 중`;
-
-            elCostGold.innerText = `${Math.floor(costGold).toLocaleString()}G`;
-            elCostRate.innerText = baseSuccessRate >= 99 ? '최대치' : `${Math.floor(costRate).toLocaleString()}G`;
+            levelEl.innerText = `+${level}`;
+            goldEl.innerText = `${gold.toLocaleString()}G`;
+            chanceEl.innerText = `${successRate}%`;
+            gpsEl.innerText = goldPerSuccess;
             
-            elGoldMultText.innerText = goldPerSuccess >= 100 ? "비용 증가: x1.5 (고효율)" : "비용 증가: x1.3";
+            goldCostEl.innerText = `${goldUpgradeCost.toLocaleString()}G`;
+            rateCostEl.innerText = successRate >= 99 ? 'MAX' : `${rateUpgradeCost.toLocaleString()}G`;
 
-            if (baseSuccessRate >= 91) elRateMultText.innerText = "비용 증가: x3.0";
-            else if (baseSuccessRate >= 76) elRateMultText.innerText = "비용 증가: x2.0";
-            else if (baseSuccessRate >= 61) elRateMultText.innerText = "비용 증가: x1.3";
-            else elRateMultText.innerText = "비용 증가: x1.1";
+            const goldBtn = document.getElementById('upgrade-gold-btn');
+            const rateBtn = document.getElementById('upgrade-rate-btn');
 
-            if (currentMultiIdx < multiStages.length) {
-                const stage = multiStages[currentMultiIdx];
-                elCostMulti.innerText = `${stage.cost.toLocaleString()}G`;
-                elMultiTitle.innerText = stage.label;
-                elMultiDesc.innerHTML = stage.reqLevel > 0 ? `요구 레벨: <span class="${level >= stage.reqLevel ? 'text-green-400' : 'text-red-400'}">+${stage.reqLevel}</span>` : `현재 배수: x${multiCount}`;
-                document.getElementById('btn-multi').style.display = 'flex';
-                document.getElementById('btn-multi').style.opacity = (gold >= stage.cost && level >= stage.reqLevel) ? '1' : '0.4';
-            } else {
-                document.getElementById('btn-multi').style.display = 'none';
-            }
-
-            if (currentNormalizeIdx < normalizeStages.length) {
-                const nStage = normalizeStages[currentNormalizeIdx];
-                elCostNormalize.innerText = `${nStage.cost.toLocaleString()}G`;
-                elNormalizeTitle.innerText = nStage.label;
-                const nextDiv = currentNormalizeIdx + 1 < normalizeStages.length ? normalizeStages[currentNormalizeIdx+1].div : 1.0;
-                elNormalizeDesc.innerText = `나누기 감소: ÷${currentPenaltyDivisor} → ÷${nStage.div}`;
-                elBtnNormalize.style.opacity = gold >= nStage.cost ? '1' : '0.4';
-            } else {
-                elBtnNormalize.style.display = 'none';
-            }
-
-            document.getElementById('btn-gold').style.opacity = gold < costGold ? '0.4' : '1';
-            document.getElementById('btn-rate').style.opacity = (baseSuccessRate >= 99 || gold < costRate) ? '0.4' : '1';
+            goldBtn.classList.toggle('opacity-50', gold < goldUpgradeCost);
+            rateBtn.classList.toggle('opacity-50', gold < rateUpgradeCost || successRate >= 99);
         }
 
-        function triggerPopUp(val) {
-            const popup = document.createElement('div');
-            popup.className = 'gold-popup font-black text-yellow-400 text-xl drop-shadow-lg';
-            popup.style.left = '50%';
-            popup.style.top = '45%';
-            popup.innerText = `+${val}G`;
-            elDisplay.appendChild(popup);
-            setTimeout(() => popup.remove(), 500);
+        function showMessage(msg, isSuccess) {
+            statusMsgEl.innerText = msg;
+            statusMsgEl.style.opacity = '1';
+            statusMsgEl.className = `mt-4 h-6 text-sm font-medium transition-opacity ${isSuccess ? 'text-green-400' : 'text-red-400'}`;
+            
+            container.classList.remove('success-flash', 'failure-flash');
+            void container.offsetWidth; 
+            container.classList.add(isSuccess ? 'success-flash' : 'failure-flash');
+
+            setTimeout(() => {
+                statusMsgEl.style.opacity = '0';
+            }, 1000);
         }
 
         function attemptUpgrade() {
-            let wins = 0;
-            let loses = 0;
-            let earnedGold = 0;
-            const currentChance = getCurrentChance();
-
-            for(let i = 0; i < multiCount; i++) {
-                if (Math.random() * 100 < currentChance) {
-                    level++;
-                    earnedGold += goldPerSuccess;
-                    wins++;
-                } else {
-                    if (level > 0) level--;
-                    loses++;
-                }
-            }
-
-            gold += earnedGold;
-            elDisplay.classList.remove('success-flash', 'failure-flash');
-            void elDisplay.offsetWidth;
-
-            if (wins >= loses && wins > 0) {
-                elDisplay.classList.add('success-flash');
-                elStatus.innerText = `성공! +${wins}`;
-                elStatus.className = "mt-4 h-5 text-sm font-black text-cyan-400 opacity-100 uppercase tracking-widest";
-                if (earnedGold > 0) triggerPopUp(earnedGold);
+            const roll = Math.random() * 100;
+            
+            if (roll < successRate) {
+                level++;
+                gold += goldPerSuccess;
+                showMessage(`성공! +${goldPerSuccess}골드 획득`, true);
             } else {
-                elDisplay.classList.add('failure-flash');
-                elStatus.innerText = `실패... -${loses}`;
-                elStatus.className = "mt-4 h-5 text-sm font-black text-red-500 opacity-100 uppercase tracking-widest";
+                if (level > 0) level--;
+                showMessage(`강화 실패... 레벨 하락`, false);
             }
-
-            setTimeout(() => { elStatus.style.opacity = '0'; }, 600);
             saveGame();
             updateUI();
         }
 
-        function upgradeGold() {
-            if (gold >= costGold) {
-                gold -= costGold;
+        function upgradeGoldPerSuccess() {
+            if (gold >= goldUpgradeCost) {
+                gold -= goldUpgradeCost;
                 goldPerSuccess += 1;
-                costGold *= goldPerSuccess >= 100 ? 1.5 : 1.3;
+                goldUpgradeCost *= 2; 
                 saveGame();
                 updateUI();
             }
         }
 
-        function upgradeRate() {
-            if (baseSuccessRate < 99 && gold >= costRate) {
-                gold -= costRate;
-                baseSuccessRate += 1;
-                if (baseSuccessRate >= 91) costRate *= 3.0;
-                else if (baseSuccessRate >= 76) costRate *= 2.0;
-                else if (baseSuccessRate >= 61) costRate *= 1.3;
-                else costRate *= 1.1;
+        function upgradeSuccessRate() {
+            if (successRate < 99 && gold >= rateUpgradeCost) {
+                gold -= rateUpgradeCost;
+                successRate += 1;
+                rateUpgradeCost *= 3; 
                 saveGame();
                 updateUI();
             }
         }
 
-        function upgradeMulti() {
-            if (currentMultiIdx < multiStages.length) {
-                const stage = multiStages[currentMultiIdx];
-                if (gold >= stage.cost && level >= stage.reqLevel) {
-                    gold -= stage.cost;
-                    multiCount = stage.count;
-                    currentMultiIdx++;
-                    saveGame();
-                    updateUI();
-                }
-            }
-        }
-
-        function upgradeNormalize() {
-            if (currentNormalizeIdx < normalizeStages.length) {
-                const stage = normalizeStages[currentNormalizeIdx];
-                if (gold >= stage.cost) {
-                    gold -= stage.cost;
-                    currentPenaltyDivisor = stage.div;
-                    currentNormalizeIdx++;
-                    saveGame();
-                    updateUI();
-                }
-            }
-        }
-
+        // 초기 로드
         window.onload = loadGame;
     </script>
 </body>
